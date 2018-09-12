@@ -1,13 +1,15 @@
 package eddiellopez.com.asyncall;
 
-import android.content.Context;
-import android.support.test.InstrumentationRegistry;
+import android.os.Looper;
 import android.support.test.runner.AndroidJUnit4;
 
+import org.junit.Before;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 
-import static org.junit.Assert.assertEquals;
+import static org.hamcrest.CoreMatchers.is;
+import static org.hamcrest.core.IsNot.not;
+import static org.junit.Assert.assertThat;
 
 /**
  * Instrumented test, which will execute on an Android device.
@@ -16,11 +18,31 @@ import static org.junit.Assert.assertEquals;
  */
 @RunWith(AndroidJUnit4.class)
 public class ExampleInstrumentedTest {
-    @Test
-    public void useAppContext() {
-        // Context of the app under test.
-        Context appContext = InstrumentationRegistry.getTargetContext();
 
-        assertEquals("eddiellopez.com.asyncall", appContext.getPackageName());
+    private Thread uiThread;
+
+    @Before
+    public void setUp() {
+        uiThread = Looper.getMainLooper().getThread();
+    }
+
+    @Test
+    public void defaultPoolExecutor() {
+        new AsynCall.Builder<String>()
+                .withTask(() -> {
+                    Thread.currentThread().getName();
+                })
+                .withResultListener(threadName -> assertThat("Thread can't be UI Thread",
+                        threadName, is(not(uiThread.getName()))))
+                .build()
+                .start();
+    }
+
+    @Test
+    public void useRunnable() {
+        new AsynCall.Builder<Integer>()
+                .withTask(() -> assertThat(Thread.currentThread(), is(not(uiThread))))
+                .build()
+                .start();
     }
 }

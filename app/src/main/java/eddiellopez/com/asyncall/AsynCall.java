@@ -3,6 +3,7 @@ package eddiellopez.com.asyncall;
 import android.os.AsyncTask;
 import android.support.annotation.NonNull;
 import android.support.annotation.Nullable;
+import android.support.annotation.UiThread;
 import android.util.Log;
 
 import java.util.concurrent.Callable;
@@ -30,10 +31,12 @@ public class AsynCall<T> extends AsyncTask<Callable<T>, Void, T> {
         mOnResultListener = result;
     }
 
-    private AsynCall(Builder builder) {
-        this.what = builder.task;
-        this.executor = builder.executor;
+    private AsynCall(Builder<T> builder) {
+        if (builder.executor != null) {
+            this.executor = builder.executor;
+        }
         this.mOnResultListener = builder.onResultListener;
+        this.what = builder.task;
         this.runnable = builder.runnable;
     }
 
@@ -72,7 +75,7 @@ public class AsynCall<T> extends AsyncTask<Callable<T>, Void, T> {
     /**
      * Builds {@link AsynCall} objects.
      */
-    public class Builder {
+    public static class Builder<T> {
         private Executor executor;
         private OnResultListener<T> onResultListener;
         private Callable<T> task;
@@ -85,7 +88,7 @@ public class AsynCall<T> extends AsyncTask<Callable<T>, Void, T> {
          * @param task The task
          * @return This builder
          */
-        public Builder withTask(Callable<T> task) {
+        public Builder<T> withTask(Callable<T> task) {
             this.task = task;
             this.runnable = null;
             return this;
@@ -98,7 +101,7 @@ public class AsynCall<T> extends AsyncTask<Callable<T>, Void, T> {
          * @param task The task as a runnable
          * @return This builder
          */
-        public Builder withTask(Runnable task) {
+        public Builder<T> withTask(Runnable task) {
             this.runnable = task;
             this.task = null;
             return this;
@@ -110,7 +113,7 @@ public class AsynCall<T> extends AsyncTask<Callable<T>, Void, T> {
          * @param listener The result listener
          * @return This builder
          */
-        public Builder withResultListener(@Nullable OnResultListener<T> listener) {
+        public Builder<T> withResultListener(@Nullable OnResultListener<T> listener) {
             this.onResultListener = listener;
             return this;
         }
@@ -122,7 +125,7 @@ public class AsynCall<T> extends AsyncTask<Callable<T>, Void, T> {
          * @param executor The executor
          * @return This builder
          */
-        public Builder withExecutor(Executor executor) {
+        public Builder<T> withExecutor(Executor executor) {
             this.executor = executor;
             return this;
         }
@@ -148,6 +151,7 @@ public class AsynCall<T> extends AsyncTask<Callable<T>, Void, T> {
          *
          * @param result The result
          */
+        @UiThread
         void onResult(T result);
     }
 }
