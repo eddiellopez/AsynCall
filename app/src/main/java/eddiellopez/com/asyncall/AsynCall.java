@@ -1,5 +1,8 @@
 package eddiellopez.com.asyncall;
 
+import android.arch.lifecycle.LifecycleObserver;
+import android.arch.lifecycle.LifecycleOwner;
+import android.arch.lifecycle.OnLifecycleEvent;
 import android.os.AsyncTask;
 import android.support.annotation.NonNull;
 import android.support.annotation.Nullable;
@@ -9,11 +12,13 @@ import android.util.Log;
 import java.util.concurrent.Callable;
 import java.util.concurrent.Executor;
 
+import static android.arch.lifecycle.Lifecycle.Event.ON_STOP;
+
 /**
  * Runs a {@link Callable} in a worker thread and
  * delivers the result in the UI thread.
  */
-public class AsynCall<T> extends AsyncTask<Callable<T>, Void, T> {
+public class AsynCall<T> extends AsyncTask<Callable<T>, Void, T> implements LifecycleObserver {
 
     private static final String TAG = "AsynCall";
     private Executor executor = THREAD_POOL_EXECUTOR;
@@ -21,6 +26,7 @@ public class AsynCall<T> extends AsyncTask<Callable<T>, Void, T> {
     private Callable<T> what;
     private OnResultListener<T> mOnResultListener;
     private Runnable runnable;
+    private boolean deliver = true;
 
     /**
      * Builds an instance of this class.
@@ -38,8 +44,11 @@ public class AsynCall<T> extends AsyncTask<Callable<T>, Void, T> {
         this.mOnResultListener = builder.onResultListener;
         this.what = builder.task;
         this.runnable = builder.runnable;
-    }
 
+        if (builder.lifecycleOwner != null) {
+            builder.lifecycleOwner.getLifecycle().addObserver(this);
+        }
+    }
 
     @Override
     protected T doInBackground(Callable<T>[] calls) {
@@ -53,7 +62,7 @@ public class AsynCall<T> extends AsyncTask<Callable<T>, Void, T> {
 
     @Override
     protected void onPostExecute(T t) {
-        if (mOnResultListener != null) {
+        if (mOnResultListener != null && deliver) {
             mOnResultListener.onResult(t);
         }
     }
@@ -61,6 +70,7 @@ public class AsynCall<T> extends AsyncTask<Callable<T>, Void, T> {
     /**
      * Starts executing the task.
      */
+    @UiThread
     public void start() {
         if (what != null) {
             //noinspection unchecked
@@ -73,6 +83,21 @@ public class AsynCall<T> extends AsyncTask<Callable<T>, Void, T> {
     }
 
     /**
+     * Executes the callable task in the default pool executor.
+     *
+     * @param task The task
+     */
+    public void exec(@NonNull Callable<T> task) {
+        //noinspection unchecked
+        executeOnExecutor(THREAD_POOL_EXECUTOR, task);
+    }
+
+    @OnLifecycleEvent(ON_STOP)
+    void onStopped() {
+        deliver = false;
+    }
+
+    /**
      * Builds {@link AsynCall} objects.
      */
     public static class Builder<T> {
@@ -80,6 +105,7 @@ public class AsynCall<T> extends AsyncTask<Callable<T>, Void, T> {
         private OnResultListener<T> onResultListener;
         private Callable<T> task;
         private Runnable runnable;
+        private LifecycleOwner lifecycleOwner;
 
         /**
          * Specifies the task to run asynchronously.
@@ -127,6 +153,18 @@ public class AsynCall<T> extends AsyncTask<Callable<T>, Void, T> {
          */
         public Builder<T> withExecutor(Executor executor) {
             this.executor = executor;
+            return this;
+        }
+
+        /**
+         * Observes a lifecycle component to determine if the result should be delivered.
+         * If the owner is STOPPED, the result won't be delivered.
+         *
+         * @param lifecycleOwner The owner
+         * @return This builder
+         */
+        private Builder<T> observe(LifecycleOwner lifecycleOwner) {
+            this.lifecycleOwner = lifecycleOwner;
             return this;
         }
 
