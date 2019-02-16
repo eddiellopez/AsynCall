@@ -63,7 +63,7 @@ allprojects {
 Add the dependency:
 ```gradle
 dependencies {
-    implementation 'com.github.eddiellopez:AsynCall:tag'
+    implementation 'com.github.eddiellopez:AsyncCall:tag'
   }
 ```
 See the [Latest Release](https://github.com/eddiellopez/AsyncCall/releases/latest) for the tag.
