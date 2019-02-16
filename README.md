@@ -49,7 +49,7 @@ There's also a direct, less recommended usage mode without using the builder:
 ```
 
 ## Add to project
-[![](https://jitpack.io/v/eddiellopez/AsynCall.svg)](https://jitpack.io/#eddiellopez/AsynCall)
+[![](https://jitpack.io/v/eddiellopez/asynccall.svg)](https://jitpack.io/#eddiellopez/asynccall)
 
 Add jitpack to your project repositores:
 ```gradle
@@ -66,5 +66,5 @@ dependencies {
     implementation 'com.github.eddiellopez:AsynCall:tag'
   }
 ```
-See the [Latest Release](https://github.com/eddiellopez/AsynCall/releases/latest) for the tag.
+See the [Latest Release](https://github.com/eddiellopez/AsyncCall/releases/latest) for the tag.
 
