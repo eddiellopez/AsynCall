@@ -1,4 +1,4 @@
-package eddiellopez.com.asyncall;
+package eddiellopez.com.asynccall;
 
 import org.junit.Test;
 

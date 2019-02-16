@@ -1,4 +1,4 @@
-package eddiellopez.com.asyncall;
+package eddiellopez.com.asynccall;
 
 import android.arch.lifecycle.LifecycleObserver;
 import android.arch.lifecycle.LifecycleOwner;
@@ -16,32 +16,38 @@ import static android.arch.lifecycle.Lifecycle.Event.ON_STOP;
 
 /**
  * Runs a {@link Callable} in a worker thread and
- * delivers the result in the UI thread.
+ * delivers the result in the UI thread. Use the {@link Builder} helper to parametrize
+ * the execution.
  */
-public class AsynCall<T> extends AsyncTask<Callable<T>, Void, T> implements LifecycleObserver {
+public class AsyncCall<T> extends AsyncTask<Callable<T>, Void, T> implements LifecycleObserver {
 
-    private static final String TAG = "AsynCall";
+    private static final String TAG = "AsyncCall";
     private Executor executor = THREAD_POOL_EXECUTOR;
     @Nullable
     private Callable<T> what;
-    private OnResultListener<T> mOnResultListener;
+    private final OnEmptyResultListener mOnEmptyResultListener;
+    private final OnResultListener<T> mOnResultListener;
     private Runnable runnable;
     private boolean deliver = true;
 
     /**
      * Builds an instance of this class.
      *
-     * @param result A {@link OnResultListener}, whose accept will be called to deliver the result, in the UI thread
+     * @param result A {@link OnResultListener}, whose accept will be called to deliver the result,
+     *               in the UI thread.
      */
-    public AsynCall(@NonNull OnResultListener<T> result) {
+    @SuppressWarnings("WeakerAccess")
+    public AsyncCall(@NonNull OnResultListener<T> result) {
         mOnResultListener = result;
+        mOnEmptyResultListener = null;
     }
 
-    private AsynCall(Builder<T> builder) {
+    private AsyncCall(Builder<T> builder) {
         if (builder.executor != null) {
             this.executor = builder.executor;
         }
         this.mOnResultListener = builder.onResultListener;
+        this.mOnEmptyResultListener = builder.onEmptyResultListener;
         this.what = builder.task;
         this.runnable = builder.runnable;
 
@@ -62,21 +68,37 @@ public class AsynCall<T> extends AsyncTask<Callable<T>, Void, T> implements Life
 
     @Override
     protected void onPostExecute(T t) {
-        if (mOnResultListener != null && deliver) {
-            mOnResultListener.onResult(t);
+        if (deliver) {
+            if (mOnResultListener != null) {
+                mOnResultListener.onResult(t);
+
+            } else if (mOnEmptyResultListener != null) {
+                mOnEmptyResultListener.onResult();
+            } else {
+                if (BuildConfig.DEBUG) {
+                    Log.w(TAG, "onPostExecute: No listener was set for this task.");
+                }
+            }
         }
     }
 
     /**
      * Starts executing the task.
+     *
+     * @throws IllegalStateException If no task was specified.
      */
+    @SuppressWarnings("WeakerAccess")
     @UiThread
     public void start() {
         if (what != null) {
             //noinspection unchecked
             executeOnExecutor(executor, what);
         } else if (runnable != null) {
-            executor.execute(runnable);
+            //noinspection unchecked
+            executeOnExecutor(executor, (Callable<T>) () -> {
+                runnable.run();
+                return null;
+            });
         } else {
             throw new IllegalArgumentException("No task was specified!");
         }
@@ -87,6 +109,7 @@ public class AsynCall<T> extends AsyncTask<Callable<T>, Void, T> implements Life
      *
      * @param task The task
      */
+    @SuppressWarnings("WeakerAccess")
     public void exec(@NonNull Callable<T> task) {
         //noinspection unchecked
         executeOnExecutor(THREAD_POOL_EXECUTOR, task);
@@ -98,21 +121,23 @@ public class AsynCall<T> extends AsyncTask<Callable<T>, Void, T> implements Life
     }
 
     /**
-     * Builds {@link AsynCall} objects.
+     * Builds {@link AsyncCall} objects.
      */
+    @SuppressWarnings("WeakerAccess")
     public static class Builder<T> {
         private Executor executor;
         private OnResultListener<T> onResultListener;
         private Callable<T> task;
         private Runnable runnable;
         private LifecycleOwner lifecycleOwner;
+        private OnEmptyResultListener onEmptyResultListener;
 
         /**
          * Specifies the task to run asynchronously.
-         * Overwrites any previously configured task.
+         * Overrides any previously configured task.
          *
-         * @param task The task
-         * @return This builder
+         * @param task The callable task.
+         * @return This builder.
          */
         public Builder<T> withTask(Callable<T> task) {
             this.task = task;
@@ -122,10 +147,10 @@ public class AsynCall<T> extends AsyncTask<Callable<T>, Void, T> implements Life
 
         /**
          * A convenience method to specify a task for which a result is not expected.
-         * Overwrites any previously configured task.
+         * Overrides any previously configured task.
          *
-         * @param task The task as a runnable
-         * @return This builder
+         * @param task The task as a runnable.
+         * @return This builder.
          */
         public Builder<T> withTask(Runnable task) {
             this.runnable = task;
@@ -134,10 +159,11 @@ public class AsynCall<T> extends AsyncTask<Callable<T>, Void, T> implements Life
         }
 
         /**
-         * Specifies the result listener.
+         * Specifies a result listener that delivers a result.
+         * See also {@link #withEmptyResultListener(OnEmptyResultListener)}.
          *
-         * @param listener The result listener
-         * @return This builder
+         * @param listener The result listener.
+         * @return This builder.
          */
         public Builder<T> withResultListener(@Nullable OnResultListener<T> listener) {
             this.onResultListener = listener;
@@ -145,11 +171,23 @@ public class AsynCall<T> extends AsyncTask<Callable<T>, Void, T> implements Life
         }
 
         /**
+         * Specifies a result listener that does not expects a result.
+         * Note that a single listener will be called. See also {@link #withResultListener(OnResultListener)}.
+         *
+         * @param listener The result listener.
+         * @return This builder.
+         */
+        public Builder<T> withEmptyResultListener(@Nullable OnEmptyResultListener listener) {
+            this.onEmptyResultListener = listener;
+            return this;
+        }
+
+        /**
          * Specifies an {@link Executor}. The default {@link AsyncTask#THREAD_POOL_EXECUTOR}
          * will be used if none specified.
          *
-         * @param executor The executor
-         * @return This builder
+         * @param executor The executor.
+         * @return This builder.
          */
         public Builder<T> withExecutor(Executor executor) {
             this.executor = executor;
@@ -160,36 +198,50 @@ public class AsynCall<T> extends AsyncTask<Callable<T>, Void, T> implements Life
          * Observes a lifecycle component to determine if the result should be delivered.
          * If the owner is STOPPED, the result won't be delivered.
          *
-         * @param lifecycleOwner The owner
-         * @return This builder
+         * @param lifecycleOwner The lifecycle owner
+         * @return This builder.
          */
-        private Builder<T> observe(LifecycleOwner lifecycleOwner) {
+        public Builder<T> observe(LifecycleOwner lifecycleOwner) {
             this.lifecycleOwner = lifecycleOwner;
             return this;
         }
 
         /**
-         * Builds an AsynCall.
+         * Builds the AsyncCall.
          *
          * @return The new object
          */
-        public AsynCall<T> build() {
-            return new AsynCall<>(this);
+        public AsyncCall<T> build() {
+            return new AsyncCall<>(this);
         }
     }
 
     /**
      * A listener to receive the result of the asynchronous operation.
      *
-     * @param <T> The type of the result
+     * @param <T> The type of the result.
      */
+    @FunctionalInterface
     public interface OnResultListener<T> {
         /**
          * Called in the UI Thread when the result is ready.
          *
-         * @param result The result
+         * @param result The result, if any, otherwise null.
          */
         @UiThread
-        void onResult(T result);
+        void onResult(@Nullable T result);
+    }
+
+    /**
+     * A convenience listener type to receive the result of the asynchronous operation, when
+     * the action to be executed does not return any value.
+     */
+    @FunctionalInterface
+    public interface OnEmptyResultListener {
+        /**
+         * Called in the UI Thread when the result is ready.
+         */
+        @UiThread
+        void onResult();
     }
 }

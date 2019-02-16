@@ -1,5 +1,5 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
-    package="eddiellopez.com.asyncall">
+    package="eddiellopez.com.asynccall">
 
     <application
         android:allowBackup="true"
