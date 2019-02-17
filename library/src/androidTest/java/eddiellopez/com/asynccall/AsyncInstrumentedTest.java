@@ -69,7 +69,8 @@ public class AsyncInstrumentedTest {
         final CountDownLatch latch = new CountDownLatch(1);
 
         // The task to run
-        Callable<Thread> task = Thread::currentThread;
+        //noinspection Convert2MethodRef: Method Reference breaks the build
+        Callable<Thread> task = () -> Thread.currentThread();
         // The result listener
         AsyncCall.OnResultListener<Thread> resultListener = threadName -> {
             // Task should've been executed in a pool thread
@@ -177,8 +178,9 @@ public class AsyncInstrumentedTest {
 
         // Use a runnable as task, provide several actions and listeners
         // We expect only the last pair is used.
+        //noinspection Convert2MethodRef: Method Reference breaks the build
         new AsyncCall.Builder<String>()
-                .withTask(Thread::currentThread)
+                .withTask(() -> Thread.currentThread())
                 .withTask(() -> Log.d(TAG, Thread.currentThread().getName()))
                 .withEmptyResultListener(() -> {
                     assertThat("This should've never been called!", 0, is(1));
@@ -210,8 +212,9 @@ public class AsyncInstrumentedTest {
     public void executor() {
         final CountDownLatch latch = new CountDownLatch(1);
 
+        //noinspection Convert2MethodRef: Method Reference breaks the build
         new AsyncCall.Builder<>()
-                .withTask(Thread::currentThread)
+                .withTask(() -> Thread.currentThread())
                 .withResultListener(thread -> {
                     assertThat("Results should always be delivered in the UI Thread!",
                             uiThread, is(not(thread)));
@@ -284,11 +287,12 @@ public class AsyncInstrumentedTest {
 
         final TestLifecycle mTestLifecycle;
 
+        @SuppressWarnings("SameParameterValue")
         TestLifecycleOwner(Lifecycle.State initialState) {
             mTestLifecycle = new TestLifecycle(initialState);
         }
 
-        private Set<LifecycleObserver> mObservers = new ArraySet<>();
+        private final Set<LifecycleObserver> mObservers = new ArraySet<>();
 
         @NonNull
         @Override
@@ -320,6 +324,7 @@ public class AsyncInstrumentedTest {
             return this;
         }
 
+        @SuppressWarnings("UnusedReturnValue")
         TestLifecycleOwner stateDown() {
             switch (mTestLifecycle.getCurrentState()) {
                 case DESTROYED:
