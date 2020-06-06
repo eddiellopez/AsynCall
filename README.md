@@ -6,7 +6,7 @@ AsyncCall will execute a task in a worker thread and deliver the result in the U
 ## Usage examples
 
 Use the `Builder` class to configure the `AsincCall` as follows:
-```
+```Java
   // The task to run in the form of a Callable
   Callable<Thread> task = Thread::currentThread;
   // The result listener
@@ -26,7 +26,7 @@ Use the `Builder` class to configure the `AsincCall` as follows:
           .start();
 ```
 Also a custom `Executor` can be used:
-```
+```Java
   mExecutorService = Executors.newSingleThreadExecutor();
 
   new AsyncCall.Builder<>()
@@ -39,7 +39,7 @@ Also a custom `Executor` can be used:
 From the above snippets, `start` should always be called from the UI Thread.  
 
 There's also a direct, less recommended usage mode without using the builder:
-```
+```Java
   AsyncCall.OnResultListener<String> resultListener
           = result -> assertThat(result, is(not(uiThread.getName())));
   Callable<String> task = () -> Thread.currentThread().getName();
@@ -52,7 +52,7 @@ There's also a direct, less recommended usage mode without using the builder:
 [![](https://jitpack.io/v/eddiellopez/asynccall.svg)](https://jitpack.io/#eddiellopez/asynccall)
 
 Add jitpack to your project repositores:
-```gradle
+```groovy
 allprojects {
     repositories {
     ...
@@ -61,7 +61,7 @@ allprojects {
   }
 ```
 Add the dependency:
-```gradle
+```groovy
 dependencies {
     implementation 'com.github.eddiellopez:AsyncCall:tag'
   }
