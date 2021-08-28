@@ -11,19 +11,14 @@ class TestThreader extends Threader<String> {
     protected TestThreader(
             @NonNull ExecutorService executor,
             @Nullable OnExceptionHandler onExceptionHandler,
-            @Nullable LifecycleOwner lifecycleOwner
+            @Nullable LifecycleOwner lifecycleOwner,
+            DeliveryProcedure<String> deliveryProcedure
     ) {
-        super(executor, onExceptionHandler, lifecycleOwner);
+        super(executor, onExceptionHandler, lifecycleOwner, deliveryProcedure);
     }
 
     @Override
     public void start() {
-        throw new UnsupportedOperationException();
-    }
-
-    @NonNull
-    @Override
-    protected Runnable getDeliveryProcedure(String string) {
         throw new UnsupportedOperationException();
     }
 }
