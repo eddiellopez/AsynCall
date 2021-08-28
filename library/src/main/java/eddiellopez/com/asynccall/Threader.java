@@ -1,9 +1,13 @@
 package eddiellopez.com.asynccall;
 
 
+import static androidx.lifecycle.Lifecycle.Event.ON_START;
+import static androidx.lifecycle.Lifecycle.Event.ON_STOP;
+
 import android.os.Build;
 import android.os.Handler;
 import android.os.Looper;
+import android.util.Log;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
@@ -16,9 +20,6 @@ import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.atomic.AtomicBoolean;
 
-import static androidx.lifecycle.Lifecycle.Event.ON_START;
-import static androidx.lifecycle.Lifecycle.Event.ON_STOP;
-
 
 /**
  * Base class for threader.
@@ -27,9 +28,7 @@ import static androidx.lifecycle.Lifecycle.Event.ON_STOP;
  *
  * @param <T> The type of the threader.
  */
-public abstract class Threader<T> implements LifecycleObserver {
-
-    private static final String TAG = "Threader";
+abstract class Threader<T> implements LifecycleObserver {
 
     @NonNull
     private final ExecutorService executor;
@@ -41,21 +40,26 @@ public abstract class Threader<T> implements LifecycleObserver {
 
     private final AtomicBoolean deliver = new AtomicBoolean(true);
 
+    private final DeliveryProcedure<T> deliveryProcedure;
+
     /**
      * The basic threader.
      *
      * @param executor           The executor.
      * @param onExceptionHandler The exception handler.
+     * @param deliveryProcedure  The delivery procedure.
      * @param lifecycleOwner     The lifecycle owner.
      */
     protected Threader(
             @NonNull ExecutorService executor,
             @Nullable OnExceptionHandler onExceptionHandler,
-            @Nullable LifecycleOwner lifecycleOwner
+            @Nullable LifecycleOwner lifecycleOwner,
+            @NonNull DeliveryProcedure<T> deliveryProcedure
     ) {
         this.executor = executor;
         this.onExceptionHandler = onExceptionHandler;
         this.lifecycleOwner = lifecycleOwner;
+        this.deliveryProcedure = deliveryProcedure;
 
         // Observe lifecycle events
         observeLifecycle();
@@ -69,42 +73,40 @@ public abstract class Threader<T> implements LifecycleObserver {
     @UiThread
     public abstract void start();
 
-    /**
-     * Returns the code to execute for delivering the result.
-     * For example, the callback to call.
-     * <p>
-     * Note this will only be called, when a lifecycle owner is under observation, if
-     * in a resumed state.
-     *
-     * @param t The result.
-     * @return The code to execute.
-     */
-    @NonNull
-    protected abstract Runnable getDeliveryProcedure(T t);
 
     protected void submit(@NonNull Callable<T> callable) {
+        // Deliver in the UI Thread if requested in the UI Thread.
+        final boolean calledOnUiThread = isUiThread();
+
         executor.execute(() -> {
             try {
                 // Run the action.
                 final T result = callable.call();
+                if (deliver.get()) {
+                    finishExecution(calledOnUiThread, () -> deliveryProcedure.deliver(result));
+                }
 
-                if (isUiThread()) {
-                    // Deliver in the UI Thread
-                    new Handler(Looper.getMainLooper()).post(() -> deliverResult(result));
-                } else {
-                    // Deliver in calling thread
-                    deliverResult(result);
-                }
             } catch (Exception e) {
-                // Check if there is an exception handling setup
+                // Check if there is an exception handling configured.
                 if (onExceptionHandler != null) {
-                    onExceptionHandler.onFailure(e);
-                } else {
-                    // Just throw the exception!?
-                    throw new RuntimeException(e); // TODO: 3/9/21 Test this
+                    finishExecution(calledOnUiThread, () -> onExceptionHandler.onFailure(e));
                 }
+                // Can't be caught outside!. A fatal exception that crashes the app.
             }
         });
+    }
+
+    protected void finishExecution(boolean calledOnUiThread, Runnable deliver) {
+        if (calledOnUiThread) {
+            // Deliver in the UI Thread.
+            new Handler(Looper.getMainLooper()).post(deliver);
+        } else {
+            // Deliver in the calling thread.
+            deliver.run();
+        }
+
+        // Finally, always stop observing the lifecycle
+        stopObservingLifecycle();
     }
 
     private void observeLifecycle() {
@@ -117,16 +119,6 @@ public abstract class Threader<T> implements LifecycleObserver {
         if (lifecycleOwner != null) {
             lifecycleOwner.getLifecycle().removeObserver(this);
         }
-    }
-
-    // TODO: 3/9/21 Test lifecycle
-    protected void deliverResult(T t) {
-        if (deliver.get()) {
-            getDeliveryProcedure(t).run();
-        }
-
-        // Finally always stop observing the lifecycle
-        stopObservingLifecycle();
     }
 
     private boolean isUiThread() {

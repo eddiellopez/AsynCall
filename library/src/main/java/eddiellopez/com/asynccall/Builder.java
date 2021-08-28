@@ -2,7 +2,9 @@ package eddiellopez.com.asynccall;
 
 import android.os.AsyncTask;
 
+import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
+import androidx.annotation.VisibleForTesting;
 import androidx.lifecycle.LifecycleOwner;
 
 import java.util.concurrent.Callable;
@@ -17,58 +19,30 @@ public class Builder<T> {
     private ExecutorService executor;
     private OnConsumableResultListener<T> onConsumableResultListener;
     private Callable<T> callable;
-    private Runnable runnable;
     private LifecycleOwner lifecycleOwner;
-    private OnEmptyResultListener onEmptyResultListener;
     private OnExceptionHandler onExceptionHandler;
+    private ThreaderFactory threaderFactory = new ThreaderFactory();
 
     /**
-     * Specifies the task to run asynchronously.
-     * Overrides any previously configured task.
+     * Specifies the calla to run asynchronously.
+     * Overrides any previously configured calla.
      *
      * @param task The callable task.
      * @return This builder.
      */
-    public Builder<T> async(Callable<T> task) {
+    public Builder<T> async(@NonNull Callable<T> task) {
         this.callable = task;
-        this.runnable = null;
-        return this;
-    }
-
-    /**
-     * A convenience method to specify a task for which a result is not expected.
-     * Overrides any previously configured task.
-     *
-     * @param task The task as a runnable.
-     * @return This builder.
-     */
-    public Builder<T> async(Runnable task) {
-        this.runnable = task;
-        this.callable = null;
         return this;
     }
 
     /**
      * Specifies a result listener that delivers a result.
-     * See also {@link #post(OnEmptyResultListener)}.
      *
      * @param listener The result listener.
      * @return This builder.
      */
-    public Builder<T> post(@Nullable OnConsumableResultListener<T> listener) {
+    public Builder<T> onResult(@Nullable OnConsumableResultListener<T> listener) {
         this.onConsumableResultListener = listener;
-        return this;
-    }
-
-    /**
-     * Specifies a result listener that does not expects a result.
-     * Note that a single listener will be called. See also {@link #post(OnConsumableResultListener)}.
-     *
-     * @param listener The result listener.
-     * @return This builder.
-     */
-    public Builder<T> post(@Nullable OnEmptyResultListener listener) {
-        this.onEmptyResultListener = listener;
         return this;
     }
 
@@ -79,7 +53,7 @@ public class Builder<T> {
      * @param executor The executor.
      * @return This builder.
      */
-    public Builder<T> withExecutorService(ExecutorService executor) {
+    public Builder<T> withExecutorService(@NonNull ExecutorService executor) {
         this.executor = executor;
         return this;
     }
@@ -91,38 +65,52 @@ public class Builder<T> {
      * @param lifecycleOwner The lifecycle owner
      * @return This builder.
      */
-    public Builder<T> observe(LifecycleOwner lifecycleOwner) {
+    public Builder<T> observe(@NonNull LifecycleOwner lifecycleOwner) {
         this.lifecycleOwner = lifecycleOwner;
         return this;
     }
 
-    public Builder<T> except(OnExceptionHandler onExceptionHandler) {
+    /**
+     * Provides an exception handler that will handle exceptions on the asynchronous task.
+     * If not provided, the responsibility of exception handling falls on the client.
+     *
+     * @param onExceptionHandler The handler, called when an exception happens in the task.
+     * @return This builder.
+     */
+    public Builder<T> except(@NonNull OnExceptionHandler onExceptionHandler) {
         this.onExceptionHandler = onExceptionHandler;
         return this;
     }
 
     /**
      * Builds and starts.
+     * After a task is started, it shouldn't be reused.
      */
     public void start() {
-        if (callable != null) {
-            new ResultThreader<>(
-                    executor,
-                    onExceptionHandler,
-                    lifecycleOwner,
-                    callable,
-                    onConsumableResultListener
-            ).start();
-        } else if (runnable != null) {
-            new EmptyThreader(
-                    executor,
-                    onExceptionHandler,
-                    lifecycleOwner,
-                    runnable,
-                    onEmptyResultListener
-            ).start();
-        } else {
+        if (callable == null) {
             throw new NullPointerException("A Threader cannot be started without a task!");
         }
+
+        if (executor == null) {
+            throw new NullPointerException("A Threader cannot be started without an Executor");
+        }
+
+        getThreaderFactory().from(
+                executor,
+                onExceptionHandler,
+                lifecycleOwner,
+                callable,
+                onConsumableResultListener
+        ).start();
+    }
+
+    @VisibleForTesting
+    ThreaderFactory getThreaderFactory() {
+        return threaderFactory;
+    }
+
+    @VisibleForTesting
+    void setThreaderFactory(ThreaderFactory threaderFactory) {
+        this.threaderFactory = threaderFactory;
     }
 }

@@ -1,57 +1,48 @@
 # AsyncCall
-Asynchronous and concurrent execution tools for Android.  
 
-AsyncCall will execute a task in a worker thread and deliver the result in the UI Thread. The `Executor` to use will be the default  `AsyncTask` pool executor unless other is specified.
+Simple concurrent execution tools for Android in Java.
+
+AsyncCall will execute a task in a worker thread and deliver the result when done. The client should
+provide an Executor and the corresponding listeners.
 
 ## Usage examples
 
-Use the `Builder` class to configure the `AsincCall` as follows:
-```
-  // The task to run in the form of a Callable
-  Callable<Thread> task = Thread::currentThread;
-  // The result listener
-  AsyncCall.OnResultListener<Thread> resultListener = threadName -> {
-      // Task will be executed in a pool thread
-      assertThat("Thread can't be UI Thread",
-              threadName, is(not(uiThread.getName())));
-      // Result will be delivered in the UI thread
-      assertThat(Thread.currentThread(), is(uiThread));
-  };
-  
-  // Configure, build and start
-  new AsyncCall.Builder<Thread>()
-          .withTask(task)
-          .withResultListener(resultListener)
-          .build()
-          .start();
-```
-Also a custom `Executor` can be used:
-```
-  mExecutorService = Executors.newSingleThreadExecutor();
+Use the `Builder` class as follows:
 
-  new AsyncCall.Builder<>()
-          .withTask(Thread::currentThread)
-          .withResultListener(thread -> assertThat(uiThread, is(not(thread))))
-          .withExecutor(mExecutorService)
-          .build()
-          .start();
 ```
-From the above snippets, `start` should always be called from the UI Thread.  
+new Builder<List<Post>>()
+        .withExecutorService(executorService)
+        // This is the task, which assumes the form of a Callable:
+        .async(postRepository::getPosts)
+        // The result is obtained here:
+        .onResult(posts->{
+        // Note the result can be null.
+        assert posts!=null;
+
+        // Update the UI.
+        posts.stream()
+        .findFirst()
+        .ifPresent(post->binding.textviewFirst.setText(post.getTitle()));
+
+        })
+        // Since this example is called from a Fragment, observe its lifecycle:
+        .observe(this)
+        // Any exception will be received here:
+        .except(e->Log.e(TAG,"onViewCreated: ",e))
+        .start();
+```
+
+Calling `start` from the UI thread, guarantees delivery on the UI Thread. Calling it from any other
+thread delivers the result in a worked thread. This applies to exceptions as well.
 
 There's also a direct, less recommended usage mode without using the builder:
-```
-  AsyncCall.OnResultListener<String> resultListener
-          = result -> assertThat(result, is(not(uiThread.getName())));
-  Callable<String> task = () -> Thread.currentThread().getName();
-
-  // Raw variant without builder
-  new AsyncCall<>(resultListener).exec(task);
-```
 
 ## Add to project
+
 [![](https://jitpack.io/v/eddiellopez/asynccall.svg)](https://jitpack.io/#eddiellopez/asynccall)
 
-Add jitpack to your project repositores:
+Add jitpack to your project repositories:
+
 ```gradle
 allprojects {
     repositories {
@@ -60,11 +51,14 @@ allprojects {
     }
   }
 ```
+
 Add the dependency:
+
 ```gradle
 dependencies {
     implementation 'com.github.eddiellopez:AsyncCall:tag'
   }
 ```
+
 See the [Latest Release](https://github.com/eddiellopez/AsyncCall/releases/latest) for the tag.
 

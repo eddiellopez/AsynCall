@@ -1,23 +1,23 @@
 package eddiellopez.com.asynccall;
 
-import org.junit.Test;
-import org.mockito.Mockito;
-
-import java.util.concurrent.Executors;
-
-import static eddiellopez.com.asynccall.TaskVerificationMatcher.completed;
 import static org.hamcrest.CoreMatchers.is;
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.after;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
+import static eddiellopez.com.asynccall.TaskVerificationMatcher.completed;
+
+import org.junit.Test;
+
+import java.util.concurrent.Executors;
 
 public class ResultThreaderTest {
 
     @Test(expected = NullPointerException.class)
     public void noCallable() {
         // Given a threader without a callable task:
+        //noinspection ConstantConditions
         final Threader<String> threader = new ResultThreader<>(
                 Executors.newSingleThreadExecutor(),
                 null,

@@ -32,9 +32,12 @@ public class ThreaderTest {
     @Mock
     private Callable<String> callable;
 
+    @Mock
+    private DeliveryProcedure<String> deliveryProcedure;
+
 
     @Before
-    public void setUp() throws Exception {
+    public void setUp() {
         MockitoAnnotations.openMocks(this);
 
         when(lifecycleOwner.getLifecycle()).thenReturn(lifecycle);
@@ -46,7 +49,8 @@ public class ThreaderTest {
         final TestThreader threader = new TestThreader(
                 executor,
                 onExceptionHandler,
-                lifecycleOwner
+                lifecycleOwner,
+                deliveryProcedure
         );
 
         // Is expected to monitor the lifecycle
@@ -54,15 +58,16 @@ public class ThreaderTest {
     }
 
     @Test
-    public void submit() throws Exception {
+    public void submit() {
         // Any threader
         final TestThreader threader = new TestThreader(
                 executor,
                 onExceptionHandler,
-                lifecycleOwner
+                lifecycleOwner,
+                deliveryProcedure
         );
 
-        // When a submit is issues
+        // When a submit is issued...
         threader.submit(callable);
 
         // We expect is executed in the executor
